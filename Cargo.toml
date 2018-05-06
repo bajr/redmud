@@ -1,0 +1,15 @@
+[package]
+name = "redmud"
+version = "0.1.0"
+authors = ["Bradley Rasmussen <rasmbj@pdx.edu>"]
+license = "LGPL-3.0-or-later"
+
+[dependencies]
+log = "*"
+simplelog = "*"
+diesel = { version = "*", features = ["postgres"] }
+dotenv = "*"
+tokio = "0.1"
+tokio-io = "0.1"
+futures = "0.1"
+bytes = "0.4"
