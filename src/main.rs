@@ -24,8 +24,6 @@
 //      1. Display welcome splash
 //      2. Authenticate or register
 //      3. Materialize PC
-//    Event handling:
-//      *
 //    Admin
 //      * Start/stop server
 //      * Player control (kick, ban, whitelist, blacklist, throttle, etc)
@@ -49,6 +47,8 @@ extern crate diesel;
 #[macro_use]
 extern crate futures;
 #[macro_use]
+extern crate lazy_static;
+#[macro_use]
 extern crate log;
 extern crate simplelog;
 extern crate tk_listen;
@@ -64,6 +64,7 @@ use std::fs::OpenOptions;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
+mod cmd;
 mod lines;
 mod player;
 mod shared;

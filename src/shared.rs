@@ -14,6 +14,7 @@ pub static SPLASH: &[u8] = b"Welcome to RedMud. Please choose an option:\n\
                             \n\
                             Your choice: ";
 
+// I need to rethink this data structure and how it's shared.
 // This is a shared list of `Tx` handles for all connected clients.
 pub struct Shared {
     pub players: HashMap<SocketAddr, Tx>,

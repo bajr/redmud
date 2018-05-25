@@ -8,6 +8,7 @@ license = "LGPL-3.0-or-later"
 bytes = "0.4"
 diesel = { version = "*", features = ["postgres"] }
 futures = "0.1"
+lazy_static = "*"
 log = "*"
 simplelog = "*"
 tk-listen = { git = "https://github.com/Cryptor1/tk-listen.git", branch = "tokio_crate_migration" }

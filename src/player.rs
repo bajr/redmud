@@ -1,6 +1,5 @@
 extern crate tokio;
 
-use bytes::{Bytes, BytesMut};
 use futures::sync::mpsc;
 use tokio::io;
 use tokio::net::TcpStream;
@@ -9,6 +8,7 @@ use tokio::prelude::*;
 use std::net::SocketAddr;
 use std::sync::{Arc, Mutex};
 
+use cmd::*;
 use lines::{RecvLines, SendLines};
 use shared::*;
 
@@ -29,6 +29,7 @@ pub struct Player {
     outsock: SendLines,         // Socket through which we will send outpu to the player
     addr: SocketAddr,           // The addr is saved so that the Drop impl can clean up its entry
     state: State,               // Player's activity state. Are they logged in?
+    tx: Tx,
 }
 //account: Account,          // A player account may have multiple characters
 
@@ -47,7 +48,7 @@ impl Player {
         let outsock = SendLines::new(send, rx);
 
         // Add this player to the list.
-        whoall.lock().unwrap().players.insert(addr, tx);
+        whoall.lock().unwrap().players.insert(addr, tx.clone());
 
         Player {
             insock,
@@ -55,37 +56,15 @@ impl Player {
             whoall,
             addr,
             state: State::Connected,
+            tx,
         }
     }
 
     fn process_input(&mut self, input: &[u8]) -> Option<()> {
         let line = String::from_utf8(input.to_vec()).unwrap();
-        let list = &self.whoall.lock().unwrap().players;
-        let selftx = list.get(&self.addr)?;
         // Process player input based on their current state
         match self.state {
-            State::Connected => {
-                // Match input to menu options or a log-in attempt
-                match line.as_str() {
-                    "h" => {
-                        selftx.unbounded_send(Bytes::from(SPLASH)).unwrap();
-                        self.outsock.poll();
-                    }
-                    "q" => {
-                        selftx
-                            .unbounded_send(Bytes::from(&b"Thanks for playing!\n"[..]))
-                            .unwrap();
-                        self.outsock.poll();
-                        return None;
-                    }
-                    "r" => unimplemented!(),
-                    "s" => unimplemented!(),
-                    "w" => unimplemented!(),
-                    _ => unimplemented!(),
-                }
-                // If log-in unsuccessful, display splash screen again
-                // If log-in successful, link them to the Account put them in Idle state
-            }
+            State::Connected => cmd_connected(&self.tx, line),
             State::Idle => {
                 // If they are enterring the world, put them into Playing state
                 // If they logout, set Account to None and put them in Connected state
@@ -102,11 +81,11 @@ impl Player {
         }
 
         // Now, send the line to all other peers (except ourselves).
-        //        for (addr, tx) in &self.whoall.lock().unwrap().players {
-        //            if *addr != self.addr {
-        //                tx.unbounded_send(line.clone()).unwrap();
-        //            }
-        //        }
+        // for (addr, tx) in &self.whoall.lock().unwrap().players {
+        //     if *addr != self.addr {
+        //         tx.unbounded_send(line.clone()).unwrap();
+        //     }
+        // }
         Some(())
     }
 }
