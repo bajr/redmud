@@ -1,0 +1,20 @@
+// Configs:
+//    Database url, port, version, name, admin creds, and user creds
+//      localhost 
+//    Server IP addr(s) and port(s)
+//    Server name
+//    Log file name(s)
+//    Map name(s) and format(s)
+//    Admins?
+//    Character encodings? (ascii vs utf-8)
+//    Text color handling?
+//    Resource limits? (can these be found within the program, too?)
+//    Modules/Extensions?
+
+// Log level (CLI arg?)
+// Config file (CLI arg?)
+
+
+// External dependencies & tools
+// export PGDATABASE=redmud
+// cargo install diesel_cli --no-default-features --features postgres

@@ -11,10 +11,9 @@
 // \xff\xfb\x18\xff\xfb'\xff\xfd\x01\xff\xfb\x03\xff\xfd\x03TEST"` connected
 // Works fine when putty does passive negotiation.
 
-// Plan of attack
-//    Startup:
-//      0. Set up logger, read config, open and validate DB,
-//      1. Prep connection handler.
+// TODO
+//  Set up configuration options
+//  Validate database(s)
 //    Data Structures:
 //      * Commands, flags, functions?
 //      * Players, Characters, Creatures, Stats/Attributes/Abilities
@@ -43,6 +42,7 @@
 //      Dynamic Permissions
 
 extern crate bytes;
+#[macro_use]
 extern crate diesel;
 #[macro_use]
 extern crate futures;
@@ -55,6 +55,8 @@ extern crate tk_listen;
 extern crate tokio;
 
 use bytes::Bytes;
+use diesel::pg::PgConnection;
+use diesel::prelude::*;
 use futures::sync::mpsc;
 use tk_listen::*;
 use tokio::net::TcpListener;
@@ -64,9 +66,11 @@ use std::fs::OpenOptions;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
+mod account;
 mod cmd;
 mod lines;
 mod player;
+mod schema;
 mod shared;
 
 use player::Player;
@@ -81,10 +85,8 @@ pub fn main() {
     init_logger();
     // TODO read configs from file
 
-    // Create the shared state. This is how all the peers communicate.
-    //
-    // The server task will hold a handle to this. For every new client, the `state` handle is
-    // cloned and passed into the task that processes the client connection.
+    // FIXME Figure out how best to allow all thread to talk to the DB when they need to...
+    let db_connection = Arc::new(Mutex::new(establish_connection()));
     let state = Arc::new(Mutex::new(Shared::new()));
 
     let addr = "127.0.0.1:3389".parse().unwrap();
@@ -97,7 +99,6 @@ pub fn main() {
         .sleep_on_error(Duration::from_secs(1))
         .map(move |socket| {
             // Spawn a task to process the connection
-            //process(socket, state.clone());
             let player = Player::new(state.clone(), socket);
             let connection = player.map_err(|e| {
                 error!("Connection error = {:?}", e);
@@ -113,6 +114,11 @@ pub fn main() {
     info!("Server running on {}", addr);
 
     tokio::run(server);
+}
+
+pub fn establish_connection() -> PgConnection {
+    let db_url = "postgres://redmud:redmud@localhost/redmud";
+    PgConnection::establish(&db_url).expect(&format!("Error connecting to {}", db_url))
 }
 
 fn init_logger() {

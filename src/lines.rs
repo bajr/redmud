@@ -1,4 +1,4 @@
-use bytes::BytesMut;
+use bytes::{Bytes, BytesMut};
 use tokio::io;
 use tokio::io::{ReadHalf, WriteHalf};
 use tokio::net::TcpStream;
@@ -85,7 +85,7 @@ impl SendLines {
         // I acknowledge that doing this will block the thread until the socket is Ready, which is
         // not in the spirit of Asynchronous I/O. But I could not find any other way of making sure
         // the player was given this prompt consistently.
-        while let Result::Ok(Async::NotReady) = outsock.poll_write(SPLASH) {}
+        while let Result::Ok(Async::NotReady) = outsock.poll_write(&Bytes::from(SPLASH)) {}
         while let Result::Ok(Async::NotReady) = outsock.poll_flush() {}
 
         SendLines { outsock, rx }

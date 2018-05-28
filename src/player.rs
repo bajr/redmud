@@ -1,5 +1,6 @@
 extern crate tokio;
 
+use bytes::Bytes;
 use futures::sync::mpsc;
 use tokio::io;
 use tokio::net::TcpStream;
@@ -60,11 +61,13 @@ impl Player {
         }
     }
 
-    fn process_input(&mut self, input: &[u8]) -> Option<()> {
-        let line = String::from_utf8(input.to_vec()).unwrap();
+    // Receive player's input and handle any valid commands for their current connection state
+    fn process_input(&mut self, input: &[u8]) -> Option<String> {
+        let mut line = String::from_utf8_lossy(input).into_owned();
+        line.retain(|c| !c.is_control());
         // Process player input based on their current state
         match self.state {
-            State::Connected => cmd_connected(&self.tx, line),
+            State::Connected => cmd_connected(line),
             State::Idle => {
                 // If they are enterring the world, put them into Playing state
                 // If they logout, set Account to None and put them in Connected state
@@ -79,22 +82,10 @@ impl Player {
                 // process input
             }
         }
-
-        // Now, send the line to all other peers (except ourselves).
-        // for (addr, tx) in &self.whoall.lock().unwrap().players {
-        //     if *addr != self.addr {
-        //         tx.unbounded_send(line.clone()).unwrap();
-        //     }
-        // }
-        Some(())
     }
 }
 
 // A `Player` is also a future. When the socket closes, the future completes.
-//
-// While processing, the peer future implementation will:
-// 1) Receive messages on its message channel and write them to the socket.
-// 2) Receive messages from the socket and broadcast them to all peers.
 impl Future for Player {
     type Item = ();
     type Error = io::Error;
@@ -105,16 +96,23 @@ impl Future for Player {
         let _ = self.outsock.poll();
         // Read new lines from the socket
         while let Async::Ready(line) = self.insock.poll()? {
-            info!("{:?}", self.state);
             if let Some(message) = line {
                 match self.process_input(&message) {
-                    None => return Ok(Async::Ready(())),
-                    _ => {}
+                    None => {
+                        self.tx
+                            .unbounded_send(Bytes::from(&b"Thanks for playing!\n"[..]));
+                        self.outsock.poll();
+                        return Ok(Async::Ready(()));
+                    }
+                    Some(msg) => {
+                        self.tx.unbounded_send(Bytes::from(msg));
+                    }
                 };
             } else {
                 // EOF was reached, remote client has disconnected, nothing more to do
                 return Ok(Async::Ready(()));
             }
+            self.outsock.poll();
         }
 
         Ok(Async::NotReady)

@@ -11,6 +11,6 @@ futures = "0.1"
 lazy_static = "*"
 log = "*"
 simplelog = "*"
-tk-listen = { git = "https://github.com/Cryptor1/tk-listen.git", branch = "tokio_crate_migration" }
+tk-listen = "*"
 tokio = "0.1"
 tokio-io = "0.1"
