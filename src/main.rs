@@ -3,43 +3,7 @@
 //  Full license information may be found in the LICENSE file in this distribution.
 
 // Disclosures:
-//  Net code was templated from various examples in Tokio; https://github.com/tokio-rs/tokio
-//  This project was loosely modeled from TinyMush; git@github.com:TinyMUSH/TinyMUSH.git
-
-// FUNKY PUTTY TELNET NEGOTIATION
-// [2018-05-09 01:02:38.935 UTC] [INFO] redmud: `b"\xff\xfb\x1f\xff\xfb
-// \xff\xfb\x18\xff\xfb'\xff\xfd\x01\xff\xfb\x03\xff\xfd\x03TEST"` connected
-// Works fine when putty does passive negotiation.
-
-// TODO
-//  Set up configuration options
-//  Validate database(s)
-//    Data Structures:
-//      * Commands, flags, functions?
-//      * Players, Characters, Creatures, Stats/Attributes/Abilities
-//      * Maps/Rooms
-//      * Entities, Items
-//    On Connection (connections require state)
-//      1. Display welcome splash
-//      2. Authenticate or register
-//      3. Materialize PC
-//    Admin
-//      * Start/stop server
-//      * Player control (kick, ban, whitelist, blacklist, throttle, etc)
-//      * Content creation
-//    Other/Stretch Goals
-//      Restart server without dropping connections
-//      Help Pages
-//      TLS/SSL
-//      IPv6
-//      Separate logging for debugging, server events and in-world events
-//      Admin interface? In-game? External?
-//      Different map structures: graphs, flat grids, geodesic grids, 3d grids.
-//        - Does it make sense for a mud to have smooth coordinate systems? How would that work?
-//      Play-by-Email mechanics influencing game world
-//      Output: UTF-8, Colors
-//      Modules
-//      Dynamic Permissions
+//  Net code was templated from chat examples in Tokio; https://github.com/tokio-rs/tokio
 
 extern crate bytes;
 #[macro_use]
@@ -55,15 +19,14 @@ extern crate tk_listen;
 extern crate tokio;
 
 use bytes::Bytes;
-use diesel::pg::PgConnection;
-use diesel::prelude::*;
 use futures::sync::mpsc;
 use tk_listen::*;
 use tokio::net::TcpListener;
 use tokio::prelude::*;
 
 use std::fs::OpenOptions;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
+//use std::thread;
 use std::time::Duration;
 
 mod account;
@@ -86,12 +49,17 @@ pub fn main() {
     // TODO read configs from file
 
     // FIXME Figure out how best to allow all thread to talk to the DB when they need to...
-    let db_connection = Arc::new(Mutex::new(establish_connection()));
-    let state = Arc::new(Mutex::new(Shared::new()));
+    let db_url = "postgres://redmud:redmud@localhost/redmud";
+    let share = Arc::new(Shared::new(&db_url));
 
     let addr = "127.0.0.1:3389".parse().unwrap();
-
     let listener = TcpListener::bind(&addr).unwrap();
+
+    // TODO Find a way to give this master thread some portion of the available memory
+    //    let (master_tx, master_rx) = mpsc::unbounded();
+    //    let master = thread::Builder::new()
+    //        .name("master".to_string())
+    //        .spawn(move || {});
 
     // The server task asynchronously iterates over and processes each incoming connection.
     let server = listener
@@ -99,7 +67,7 @@ pub fn main() {
         .sleep_on_error(Duration::from_secs(1))
         .map(move |socket| {
             // Spawn a task to process the connection
-            let player = Player::new(state.clone(), socket);
+            let player = Player::new(share.clone(), socket);
             let connection = player.map_err(|e| {
                 error!("Connection error = {:?}", e);
             });
@@ -116,11 +84,7 @@ pub fn main() {
     tokio::run(server);
 }
 
-pub fn establish_connection() -> PgConnection {
-    let db_url = "postgres://redmud:redmud@localhost/redmud";
-    PgConnection::establish(&db_url).expect(&format!("Error connecting to {}", db_url))
-}
-
+// Set up logging utility for server monitoring and debugging info
 fn init_logger() {
     let log_conf = simplelog::Config {
         time: Some(simplelog::Level::Error),
@@ -132,7 +96,7 @@ fn init_logger() {
     simplelog::CombinedLogger::init(vec![
         simplelog::TermLogger::new(simplelog::LevelFilter::Debug, log_conf).unwrap(),
         simplelog::WriteLogger::new(
-            simplelog::LevelFilter::Debug,
+            simplelog::LevelFilter::Info,
             log_conf,
             OpenOptions::new()
                 .write(true)
@@ -141,9 +105,4 @@ fn init_logger() {
                 .expect("Could not open log file!"),
         ),
     ]).expect("Failed to initialize logger");
-    error!("Error");
-    warn!("Warning");
-    info!("Info");
-    debug!("Debug");
-    trace!("Trace");
 }

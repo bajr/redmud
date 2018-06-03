@@ -1,5 +1,3 @@
-use super::Tx;
-use bytes::{Bytes, BytesMut};
 use shared::*;
 use std::collections::HashMap;
 use std::iter::Iterator;
@@ -21,11 +19,11 @@ lazy_static! {
     };
 }
 
-fn help(line: &mut SplitWhitespace) -> Option<String> {
+fn help(_line: &mut SplitWhitespace) -> Option<String> {
     Some(SPLASH.to_string())
 }
 
-fn quit(line: &mut SplitWhitespace) -> Option<String> {
+fn quit(_line: &mut SplitWhitespace) -> Option<String> {
     None
 }
 

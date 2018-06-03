@@ -100,7 +100,6 @@ impl Future for SendLines {
     fn poll(&mut self) -> Poll<(), io::Error> {
         // Tokio (and futures) use cooperative scheduling without any preemption.
         // If a task never yields execution back to the executor, then other tasks may be starved.
-        //
         // To deal with this, robust applications should not have any unbounded loops.
         // So we will read at most `LINES_PER_TICK` lines from the client on each tick.
         const LINES_PER_TICK: usize = 10;

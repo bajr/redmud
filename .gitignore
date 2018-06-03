@@ -3,4 +3,5 @@
 !LICENSE
 !*/
 !*.rs
+!*.md
 !*.toml

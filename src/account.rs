@@ -5,4 +5,6 @@ pub struct Account {
     name: String,
     salt: String,
     hash: String,
+    //created: ,
+    //lastseen: ,
 }

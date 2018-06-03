@@ -7,7 +7,7 @@ use tokio::net::TcpStream;
 use tokio::prelude::*;
 
 use std::net::SocketAddr;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 use cmd::*;
 use lines::{RecvLines, SendLines};
@@ -25,18 +25,18 @@ enum State {
 
 // The state for each connected client
 pub struct Player {
-    whoall: Arc<Mutex<Shared>>, // Every player has a handle to the list of connected players
-    insock: RecvLines,          // Socket through which we will receive input from the player
-    outsock: SendLines,         // Socket through which we will send outpu to the player
-    addr: SocketAddr,           // The addr is saved so that the Drop impl can clean up its entry
-    state: State,               // Player's activity state. Are they logged in?
+    share: Arc<Shared>, // Handle to various 'global' structures
+    insock: RecvLines,  // Socket through which we will receive input from the player
+    outsock: SendLines, // Socket through which we will send outpu to the player
+    addr: SocketAddr,   // The addr is saved so that the Drop impl can clean up its entry
+    state: State,       // Player's activity state. Are they logged in?
     tx: Tx,
 }
 //account: Account,          // A player account may have multiple characters
 
 // TODO Bind players to their Account after they've connected
 impl Player {
-    pub fn new(whoall: Arc<Mutex<Shared>>, sock: TcpStream) -> Player {
+    pub fn new(share: Arc<Shared>, sock: TcpStream) -> Player {
         // Get the client socket address
         let addr = sock.peer_addr().unwrap();
 
@@ -49,24 +49,25 @@ impl Player {
         let outsock = SendLines::new(send, rx);
 
         // Add this player to the list.
-        whoall.lock().unwrap().players.insert(addr, tx.clone());
+        share.players.write().unwrap().insert(addr, tx.clone());
 
         Player {
+            share,
             insock,
             outsock,
-            whoall,
             addr,
             state: State::Connected,
             tx,
         }
     }
 
-    // Receive player's input and handle any valid commands for their current connection state
+    // TODO Does it make sense to separate command parsing from command processing? Why?
+    // Parse player's input and process any valid commands for their current connection state
     fn process_input(&mut self, input: &[u8]) -> Option<String> {
         let mut line = String::from_utf8_lossy(input).into_owned();
         line.retain(|c| !c.is_control());
         // Process player input based on their current state
-        match self.state {
+        let action = match self.state {
             State::Connected => cmd_connected(line),
             State::Idle => {
                 // If they are enterring the world, put them into Playing state
@@ -81,7 +82,8 @@ impl Player {
                 unimplemented!();
                 // process input
             }
-        }
+        };
+        action
     }
 }
 
@@ -99,28 +101,30 @@ impl Future for Player {
             if let Some(message) = line {
                 match self.process_input(&message) {
                     None => {
-                        self.tx
+                        let _ = self.tx
                             .unbounded_send(Bytes::from(&b"Thanks for playing!\n"[..]));
-                        self.outsock.poll();
+                        let _ = self.outsock.poll();
                         return Ok(Async::Ready(()));
                     }
                     Some(msg) => {
-                        self.tx.unbounded_send(Bytes::from(msg));
+                        let _ = self.tx.unbounded_send(Bytes::from(msg));
                     }
                 };
             } else {
-                // EOF was reached, remote client has disconnected, nothing more to do
+                // EOF was reached, client has disconnected
                 return Ok(Async::Ready(()));
             }
-            self.outsock.poll();
+            let _ = self.outsock.poll();
         }
 
         Ok(Async::NotReady)
     }
 }
 
+// This is called when a player disconnects in order to remove them from the shared player list.
 impl Drop for Player {
     fn drop(&mut self) {
-        self.whoall.lock().unwrap().players.remove(&self.addr);
+        debug!("Player Disconnected");
+        self.share.players.write().unwrap().remove(&self.addr);
     }
 }
