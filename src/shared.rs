@@ -3,7 +3,7 @@ use diesel::prelude::*;
 
 use std::collections::HashMap;
 use std::net::SocketAddr;
-use std::sync::{Mutex, RwLock};
+use std::sync::Mutex;
 use std::time::SystemTime;
 
 use super::Tx;
@@ -20,14 +20,14 @@ pub static SPLASH: &str = "Welcome to RedMud. Please choose an option:\n\
                            \n\
                            Your choice: ";
 
-// TODO I need to rethink this data structure and how it's shared.
+// TODO I need to rethink this data structure and how/why it's shared.
 // Specifically, the reasonability of sharing this data with every player connection vs having
 // 'thin' threads for player connections pass messages to a master thread for processing.
 // I can worry about that later though. This works for now.
 /// A structure of all the things that need to be shared safely among all players
 pub struct Shared {
-    pub players: RwLock<HashMap<SocketAddr, Tx>>, // We will read this more often than write
-    pub db_conn: Mutex<PgConnection>,             // DB access is a blocking operation
+    pub players: Mutex<HashMap<SocketAddr, Tx>>, // We will read this more often than write
+    pub db_conn: Mutex<PgConnection>,            // DB access is a blocking operation
     srv_stats: Mutex<Stats>,
 }
 
@@ -51,7 +51,7 @@ impl Shared {
         let conn =
             PgConnection::establish(db_url).expect(&format!("Error connecting to {}", db_url));
         Shared {
-            players: RwLock::new(HashMap::new()),
+            players: Mutex::new(HashMap::new()),
             db_conn: Mutex::new(conn),
             srv_stats: Mutex::new(Stats::new()),
         }

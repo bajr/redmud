@@ -5,6 +5,7 @@
 // Disclosures:
 //  Net code was templated from chat examples in Tokio; https://github.com/tokio-rs/tokio
 
+extern crate argon2rs;
 extern crate bytes;
 #[macro_use]
 extern crate diesel;
@@ -14,6 +15,7 @@ extern crate futures;
 extern crate lazy_static;
 #[macro_use]
 extern crate log;
+extern crate rand;
 extern crate simplelog;
 extern crate tk_listen;
 extern crate tokio;

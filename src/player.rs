@@ -49,7 +49,7 @@ impl Player {
         let outsock = SendLines::new(send, rx);
 
         // Add this player to the list.
-        share.players.write().unwrap().insert(addr, tx.clone());
+        share.players.lock().unwrap().insert(addr, tx.clone());
 
         Player {
             share,
@@ -68,7 +68,7 @@ impl Player {
         line.retain(|c| !c.is_control());
         // Process player input based on their current state
         let action = match self.state {
-            State::Connected => cmd_connected(line),
+            State::Connected => cmd_connected(self.share.clone(), line),
             State::Idle => {
                 // If they are enterring the world, put them into Playing state
                 // If they logout, set Account to None and put them in Connected state
@@ -125,6 +125,6 @@ impl Future for Player {
 impl Drop for Player {
     fn drop(&mut self) {
         debug!("Player Disconnected");
-        self.share.players.write().unwrap().remove(&self.addr);
+        self.share.players.lock().unwrap().remove(&self.addr);
     }
 }

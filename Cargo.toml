@@ -5,11 +5,13 @@ authors = ["Bradley Rasmussen <rasmbj@pdx.edu>"]
 license = "LGPL-3.0-or-later"
 
 [dependencies]
+argon2rs = "*"
 bytes = "0.4"
 diesel = { version = "*", features = ["postgres"] }
 futures = "0.1"
 lazy_static = "*"
 log = "*"
+rand = "0.5"
 simplelog = "*"
 tk-listen = "*"
 tokio = "0.1"

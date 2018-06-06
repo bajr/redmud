@@ -1,9 +1,23 @@
-use shared::*;
+use diesel::insert_into;
+use diesel::prelude::*;
+
 use std::collections::HashMap;
 use std::iter::Iterator;
 use std::str::SplitWhitespace;
+use std::sync::Arc;
 
-type CmdFn = fn(&mut SplitWhitespace) -> Option<String>;
+use account::*;
+use shared::*;
+
+/// Type for command functions
+type CmdFn = fn(Arc<Shared>, &mut SplitWhitespace) -> Option<String>;
+
+#[derive(Debug)]
+enum Action {
+    Quit,
+    Register,
+    Noop,
+}
 
 // Create a table for commands. This particular use case doesn't need to be a hashmap, but I wanted
 // to see if it could be done for when I get around to letting players alias their own commands.
@@ -19,24 +33,39 @@ lazy_static! {
     };
 }
 
-fn help(_line: &mut SplitWhitespace) -> Option<String> {
+/// Display the splash text
+fn help(_share: Arc<Shared>, _line: &mut SplitWhitespace) -> Option<String> {
     Some(SPLASH.to_string())
 }
 
-fn quit(_line: &mut SplitWhitespace) -> Option<String> {
+/// Say goodbye to the player and disconnect them
+fn quit(_share: Arc<Shared>, _line: &mut SplitWhitespace) -> Option<String> {
     None
 }
 
-fn register(line: &mut SplitWhitespace) -> Option<String> {
+/// Attempt to register a new player account
+fn register(share: Arc<Shared>, line: &mut SplitWhitespace) -> Option<String> {
+    use schema::accounts;
+
     if let Some(name) = line.next() {
-        Some(format!("I found a name: {}\n", name))
+        if let Some(passwd) = line.next() {
+            let acct = Account::new(name.to_string(), passwd.to_string());
+            let db_conn = share.db_conn.lock().unwrap();
+            insert_into(accounts::table)
+                .values(&acct)
+                .get_result(db_conn)
+                .expect("Error creating user account");
+            return Some(format!("I found a name: {}\n", name));
+        } else {
+            Some(format!("No password given\n"))
+        }
     } else {
         Some(format!("No name given\n"))
     }
 }
 
 // Parse commands for players in Connected state
-pub fn cmd_connected(input: String) -> Option<String> {
+pub fn cmd_connected(share: Arc<Shared>, input: String) -> Option<String> {
     let mut line = input.split_whitespace();
     if let Some(cmd) = line.next() {
         let cmd_match: Vec<&str> = CONN_CMDS
@@ -54,7 +83,7 @@ pub fn cmd_connected(input: String) -> Option<String> {
         } else {
             info!("Processing: {:?}", cmd);
             let func = CONN_CMDS.get(cmd_match.first().unwrap()).unwrap();
-            func(&mut line)
+            func(share, &mut line)
         }
     } else {
         info!("We didn't get anything: {}", input);
