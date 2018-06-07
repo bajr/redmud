@@ -1,5 +1,7 @@
 use diesel::insert_into;
 use diesel::prelude::*;
+use r2d2::Pool;
+use r2d2_diesel::ConnectionManager;
 
 use std::collections::HashMap;
 use std::iter::Iterator;
@@ -50,18 +52,15 @@ fn register(share: Arc<Shared>, line: &mut SplitWhitespace) -> Option<String> {
     if let Some(name) = line.next() {
         if let Some(passwd) = line.next() {
             let acct = Account::new(name.to_string(), passwd.to_string());
-            let db_conn = share.db_conn.lock().unwrap();
-            insert_into(accounts::table)
+            let mut db_conn = share.db_conn.get().unwrap();
+            let _ = insert_into(accounts::table)
                 .values(&acct)
-                .get_result(db_conn)
-                .expect("Error creating user account");
+                .execute(&*db_conn)
+                .unwrap();
             return Some(format!("I found a name: {}\n", name));
-        } else {
-            Some(format!("No password given\n"))
         }
-    } else {
-        Some(format!("No name given\n"))
     }
+    Some(format!("Registration Failed\n"))
 }
 
 // Parse commands for players in Connected state

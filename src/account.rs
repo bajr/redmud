@@ -6,7 +6,7 @@ use std::time::SystemTime;
 
 use schema::accounts;
 
-#[derive(Queryable, Insertable)]
+#[derive(Queryable, Insertable, Debug)]
 #[table_name = "accounts"]
 pub struct Account {
     name: String,

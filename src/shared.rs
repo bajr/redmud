@@ -1,5 +1,7 @@
 use diesel::pg::PgConnection;
 use diesel::prelude::*;
+use r2d2::Pool;
+use r2d2_diesel::ConnectionManager;
 
 use std::collections::HashMap;
 use std::net::SocketAddr;
@@ -27,7 +29,7 @@ pub static SPLASH: &str = "Welcome to RedMud. Please choose an option:\n\
 /// A structure of all the things that need to be shared safely among all players
 pub struct Shared {
     pub players: Mutex<HashMap<SocketAddr, Tx>>, // We will read this more often than write
-    pub db_conn: Mutex<PgConnection>,            // DB access is a blocking operation
+    pub db_conn: Pool<ConnectionManager<PgConnection>>,
     srv_stats: Mutex<Stats>,
 }
 
@@ -48,11 +50,13 @@ impl Stats {
 
 impl Shared {
     pub fn new(db_url: &str) -> Self {
-        let conn =
-            PgConnection::establish(db_url).expect(&format!("Error connecting to {}", db_url));
+        let manager = ConnectionManager::<PgConnection>::new(db_url);
+        let db_conn = Pool::builder()
+            .build(manager)
+            .expect("Failed to create database connection pool.");
         Shared {
             players: Mutex::new(HashMap::new()),
-            db_conn: Mutex::new(conn),
+            db_conn,
             srv_stats: Mutex::new(Stats::new()),
         }
     }

@@ -15,6 +15,8 @@ extern crate futures;
 extern crate lazy_static;
 #[macro_use]
 extern crate log;
+extern crate r2d2;
+extern crate r2d2_diesel;
 extern crate rand;
 extern crate simplelog;
 extern crate tk_listen;
@@ -51,7 +53,7 @@ pub fn main() {
     // TODO read configs from file
 
     // FIXME Figure out how best to allow all thread to talk to the DB when they need to...
-    let db_url = "postgres://redmud:redmud@localhost/redmud";
+    let db_url = "postgres://redmud:redmud@localhost/redmuddb";
     let share = Arc::new(Shared::new(&db_url));
 
     let addr = "127.0.0.1:3389".parse().unwrap();
