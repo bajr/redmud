@@ -53,11 +53,18 @@ fn register(share: Arc<Shared>, line: &mut SplitWhitespace) -> Option<String> {
         if let Some(passwd) = line.next() {
             let acct = Account::new(name.to_string(), passwd.to_string());
             let mut db_conn = share.db_conn.get().unwrap();
-            let _ = insert_into(accounts::table)
-                .values(&acct)
-                .execute(&*db_conn)
-                .unwrap();
-            return Some(format!("I found a name: {}\n", name));
+            if let Ok(exists) = accounts::table.find(name).first::<Account>(&*db_conn) {
+                return Some(format!(
+                    "'{}' already exists. Please choose a different name.\n",
+                    name
+                ));
+            } else {
+                let _ = insert_into(accounts::table)
+                    .values(&acct)
+                    .execute(&*db_conn)
+                    .unwrap();
+                return Some(format!("Successfully registered '{}'\n", name));
+            }
         }
     }
     Some(format!("Registration Failed\n"))

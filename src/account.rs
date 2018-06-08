@@ -10,7 +10,7 @@ use schema::accounts;
 #[table_name = "accounts"]
 pub struct Account {
     name: String,
-    email: String,
+    email: Option<String>,
     valid: bool,
     salt: Vec<u8>,
     hash: Vec<u8>,
@@ -30,7 +30,7 @@ impl Account {
 
         Account {
             name,
-            email: "".to_string(),
+            email: Some("".to_string()),
             valid: false,
             salt,
             hash,
