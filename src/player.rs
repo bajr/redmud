@@ -8,6 +8,7 @@ use tokio::prelude::*;
 
 use std::net::SocketAddr;
 
+use account::Account;
 use cmd::ConnAction::*;
 use cmd::*;
 use lines::{RecvLines, SendLines};
@@ -19,8 +20,8 @@ use super::Tx;
 enum State {
     Connected, // Player just connected and has not yet logged in
     Idle,      // Player is logged in but not in the game world
-    Playing,   // Player is playing
-    Prison,    // Player is being punished
+    Playing(Account), // Player is playing
+               //Prison,    // Player is being punished
 }
 
 // The state for each connected client
@@ -33,7 +34,6 @@ pub struct Player {
 }
 //account: Account,          // A player account may have multiple characters
 
-// TODO Bind players to their Account after they've connected
 impl Player {
     pub fn new(sock: TcpStream) -> Player {
         // Get the client socket address
@@ -68,24 +68,21 @@ impl Player {
         let action = match self.state {
             State::Connected => match cmd_connected(line) {
                 Disconnect => None,
-                Login(s) => {
-                    self.state = State::Idle;
+                Login(acct, s) => {
+                    self.state = State::Playing(acct);
                     Some(s)
                 }
                 Noop(s) => Some(s),
             },
             State::Idle => {
-                // If they are enterring the world, put them into Playing state
                 // If they logout, set Account to None and put them in Connected state
-                Some(format!("You are Idle\n"))
-            }
-            State::Playing => {
-                // process input
+                //Some(format!("You are Idle\n"))
                 unimplemented!();
             }
-            State::Prison => {
-                unimplemented!();
+            State::Playing(ref acct) => {
+                // If they are enterring the world, put them into Playing state
                 // process input
+                unimplemented!();
             }
         };
         action

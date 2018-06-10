@@ -13,7 +13,7 @@ type CmdFn = fn(&mut SplitWhitespace) -> ConnAction;
 #[derive(Debug)]
 pub enum ConnAction {
     Disconnect,
-    Login(String),
+    Login(Account, String),
     Noop(String),
 }
 
@@ -50,7 +50,7 @@ fn register(line: &mut SplitWhitespace) -> ConnAction {
     if let Some(name) = line.next() {
         if let Some(passwd) = line.next() {
             match Account::new(name.to_string(), passwd.to_string()) {
-                Ok(acct) => return Login(format!("Registered new user: {}", acct.name)),
+                Ok(acct) => return Login(acct, format!("Registered new user: {}", name)),
                 Err(e) => return Noop(e),
             }
         }
@@ -63,7 +63,7 @@ fn login(line: &mut SplitWhitespace) -> ConnAction {
     if let Some(name) = line.next() {
         if let Some(passwd) = line.next() {
             match Account::login(name.to_string(), passwd.to_string()) {
-                Ok(acct) => return Login(format!("Successfully logged in as {}\n", acct.name)),
+                Ok(acct) => return Login(acct, format!("Successfully logged in as {}\n", name)),
                 Err(e) => return Noop(e),
             }
         }
