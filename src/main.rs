@@ -29,7 +29,6 @@ use tokio::net::TcpListener;
 use tokio::prelude::*;
 
 use std::fs::OpenOptions;
-use std::sync::Arc;
 //use std::thread;
 use std::time::Duration;
 
@@ -41,7 +40,6 @@ mod schema;
 mod shared;
 
 use player::Player;
-use shared::Shared;
 
 // TODO Make these bounded
 // Shorthand for the transmit/receive parts of the message channel.
@@ -51,10 +49,6 @@ type Rx = mpsc::UnboundedReceiver<Bytes>;
 pub fn main() {
     init_logger();
     // TODO read configs from file
-
-    // FIXME Figure out how best to allow all thread to talk to the DB when they need to...
-    let db_url = "postgres://redmud:redmud@localhost/redmuddb";
-    let share = Arc::new(Shared::new(&db_url));
 
     let addr = "127.0.0.1:3389".parse().unwrap();
     let listener = TcpListener::bind(&addr).unwrap();
@@ -71,7 +65,7 @@ pub fn main() {
         .sleep_on_error(Duration::from_secs(1))
         .map(move |socket| {
             // Spawn a task to process the connection
-            let player = Player::new(share.clone(), socket);
+            let player = Player::new(socket);
             let connection = player.map_err(|e| {
                 error!("Connection error = {:?}", e);
             });

@@ -7,8 +7,8 @@ use tokio::net::TcpStream;
 use tokio::prelude::*;
 
 use std::net::SocketAddr;
-use std::sync::Arc;
 
+use cmd::ConnAction::*;
 use cmd::*;
 use lines::{RecvLines, SendLines};
 use shared::*;
@@ -25,7 +25,6 @@ enum State {
 
 // The state for each connected client
 pub struct Player {
-    share: Arc<Shared>, // Handle to various 'global' structures
     insock: RecvLines,  // Socket through which we will receive input from the player
     outsock: SendLines, // Socket through which we will send outpu to the player
     addr: SocketAddr,   // The addr is saved so that the Drop impl can clean up its entry
@@ -36,7 +35,7 @@ pub struct Player {
 
 // TODO Bind players to their Account after they've connected
 impl Player {
-    pub fn new(share: Arc<Shared>, sock: TcpStream) -> Player {
+    pub fn new(sock: TcpStream) -> Player {
         // Get the client socket address
         let addr = sock.peer_addr().unwrap();
 
@@ -49,10 +48,9 @@ impl Player {
         let outsock = SendLines::new(send, rx);
 
         // Add this player to the list.
-        share.players.lock().unwrap().insert(addr, tx.clone());
+        SHARE.players.lock().unwrap().insert(addr, tx.clone());
 
         Player {
-            share,
             insock,
             outsock,
             addr,
@@ -68,11 +66,18 @@ impl Player {
         line.retain(|c| !c.is_control());
         // Process player input based on their current state
         let action = match self.state {
-            State::Connected => cmd_connected(self.share.clone(), line),
+            State::Connected => match cmd_connected(line) {
+                Disconnect => None,
+                Login(s) => {
+                    self.state = State::Idle;
+                    Some(s)
+                }
+                Noop(s) => Some(s),
+            },
             State::Idle => {
                 // If they are enterring the world, put them into Playing state
                 // If they logout, set Account to None and put them in Connected state
-                unimplemented!();
+                Some(format!("You are Idle\n"))
             }
             State::Playing => {
                 // process input
@@ -125,6 +130,6 @@ impl Future for Player {
 impl Drop for Player {
     fn drop(&mut self) {
         debug!("Player Disconnected");
-        self.share.players.lock().unwrap().remove(&self.addr);
+        SHARE.players.lock().unwrap().remove(&self.addr);
     }
 }

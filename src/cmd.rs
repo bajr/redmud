@@ -1,25 +1,23 @@
-use diesel::insert_into;
 use diesel::prelude::*;
-use r2d2::Pool;
-use r2d2_diesel::ConnectionManager;
 
 use std::collections::HashMap;
 use std::iter::Iterator;
 use std::str::SplitWhitespace;
-use std::sync::Arc;
 
 use account::*;
 use shared::*;
 
 /// Type for command functions
-type CmdFn = fn(Arc<Shared>, &mut SplitWhitespace) -> Option<String>;
+type CmdFn = fn(&mut SplitWhitespace) -> ConnAction;
 
 #[derive(Debug)]
-enum Action {
-    Quit,
-    Register,
-    Noop,
+pub enum ConnAction {
+    Disconnect,
+    Login(String),
+    Noop(String),
 }
+
+use self::ConnAction::*;
 
 // Create a table for commands. This particular use case doesn't need to be a hashmap, but I wanted
 // to see if it could be done for when I get around to letting players alias their own commands.
@@ -29,6 +27,7 @@ lazy_static! {
         m.insert("help", help as CmdFn);
         m.insert("quit", quit as CmdFn);
         m.insert("register", register as CmdFn);
+        m.insert("login", login as CmdFn);
         //m.insert("stats", stats as CmdFn);
         //m.insert("who", who as CmdFn);
         m
@@ -36,42 +35,44 @@ lazy_static! {
 }
 
 /// Display the splash text
-fn help(_share: Arc<Shared>, _line: &mut SplitWhitespace) -> Option<String> {
-    Some(SPLASH.to_string())
+fn help(_line: &mut SplitWhitespace) -> ConnAction {
+    Noop(SPLASH.to_string())
 }
 
 /// Say goodbye to the player and disconnect them
-fn quit(_share: Arc<Shared>, _line: &mut SplitWhitespace) -> Option<String> {
-    None
+fn quit(_line: &mut SplitWhitespace) -> ConnAction {
+    Disconnect
 }
 
+// TODO this should auto-login the player and change their state
 /// Attempt to register a new player account
-fn register(share: Arc<Shared>, line: &mut SplitWhitespace) -> Option<String> {
-    use schema::accounts;
-
+fn register(line: &mut SplitWhitespace) -> ConnAction {
     if let Some(name) = line.next() {
         if let Some(passwd) = line.next() {
-            let acct = Account::new(name.to_string(), passwd.to_string());
-            let mut db_conn = share.db_conn.get().unwrap();
-            if let Ok(exists) = accounts::table.find(name).first::<Account>(&*db_conn) {
-                return Some(format!(
-                    "'{}' already exists. Please choose a different name.\n",
-                    name
-                ));
-            } else {
-                let _ = insert_into(accounts::table)
-                    .values(&acct)
-                    .execute(&*db_conn)
-                    .unwrap();
-                return Some(format!("Successfully registered '{}'\n", name));
+            match Account::new(name.to_string(), passwd.to_string()) {
+                Ok(acct) => return Login(format!("Registered new user: {}", acct.name)),
+                Err(e) => return Noop(e),
             }
         }
     }
-    Some(format!("Registration Failed\n"))
+    Noop(format!("Registration Failed\n"))
 }
 
-// Parse commands for players in Connected state
-pub fn cmd_connected(share: Arc<Shared>, input: String) -> Option<String> {
+/// Log a player into their account
+fn login(line: &mut SplitWhitespace) -> ConnAction {
+    if let Some(name) = line.next() {
+        if let Some(passwd) = line.next() {
+            match Account::login(name.to_string(), passwd.to_string()) {
+                Ok(acct) => return Login(format!("Successfully logged in as {}\n", acct.name)),
+                Err(e) => return Noop(e),
+            }
+        }
+    }
+    Noop(format!("Invalid login. Try again.\n"))
+}
+
+/// Parse commands for players in `Connected` state
+pub fn cmd_connected(input: String) -> ConnAction {
     let mut line = input.split_whitespace();
     if let Some(cmd) = line.next() {
         let cmd_match: Vec<&str> = CONN_CMDS
@@ -80,19 +81,19 @@ pub fn cmd_connected(share: Arc<Shared>, input: String) -> Option<String> {
             .map(|&s| s)
             .collect();
         if cmd_match.is_empty() {
-            Some(format!("Unknown command: {:?}\n", cmd))
+            let reline = format!("{} {}", cmd, line.collect::<String>());
+            let mut reline = reline.split_whitespace();
+            login(&mut reline)
         } else if cmd_match.len() > 1 {
-            Some(format!(
+            Noop(format!(
                 "Ambiguous command: {:?}\nMatches:{:?}\n",
                 cmd, cmd_match
             ))
         } else {
-            info!("Processing: {:?}", cmd);
             let func = CONN_CMDS.get(cmd_match.first().unwrap()).unwrap();
-            func(share, &mut line)
+            func(&mut line)
         }
     } else {
-        info!("We didn't get anything: {}", input);
-        Some("".to_string())
+        Noop("".to_string())
     }
 }
