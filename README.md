@@ -13,18 +13,18 @@ following instructions are written for Linux, but other systems should be possib
 
 1. Create a database cluster and log into the database as the `postgres` superuser:
 
-    sudo pg_createcluster 10 main --start
-    sudo -u postgres psql postgres
+        sudo pg_createcluster 10 main --start
+        sudo -u postgres psql postgres
 
 1. Create an administrative role for the RedMUD database (choosing a secure password).
 We will use this role to initialize the database:
 
-    CREATE ROLE redmud_admin LOGIN CREATEROLE CREATEDB PASSWORD 'wordpass';
-    GRANT pg_monitor TO redmud_admin;
+        CREATE ROLE redmud_admin LOGIN CREATEROLE CREATEDB PASSWORD 'wordpass';
+        GRANT pg_monitor TO redmud_admin;
 
 1. Use diesel to initialize the database (substituting your password):
 
-    diesel setup --database-url='postgres://redmud_admin:wordpass@localhost/redmuddb'
+        diesel setup --database-url='postgres://redmud_admin:wordpass@localhost/redmuddb'
 
 1. Once all dependencies are installed and the database is initialized, run RedMUD with `cargo run`.
 The server will available via any MUD client or telnet by pointing them to localhost on port 3389.
