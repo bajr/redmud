@@ -8,6 +8,10 @@ use std::time::SystemTime;
 use schema::accounts;
 use shared::*;
 
+// TODO Other fields to associate with player accounts:
+// . failed login attempts since last login
+// . characters
+// . status (banned, player, god, admin, etc.)
 #[derive(Queryable, Insertable, Debug)]
 #[table_name = "accounts"]
 pub struct Account {
@@ -67,12 +71,13 @@ impl Account {
         }
     }
 
+    // TODO Update lastseen field
+    /// Validate a user's login credentials
     pub fn login(name: String, passwd: String) -> Result<Account, String> {
         use schema::accounts;
 
         let db_conn = SHARE.db_conn.get().unwrap();
 
-        // Check if the account already exists
         if let Ok(acct) = accounts::table.find(&name).first::<Account>(&*db_conn) {
             let mut given_hash = vec![0u8; 32];
             let argon = Argon2::default(Variant::Argon2i);

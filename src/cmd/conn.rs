@@ -1,14 +1,11 @@
-use diesel::prelude::*;
-
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 use std::iter::Iterator;
 use std::str::SplitWhitespace;
 
 use account::*;
 use shared::*;
 
-/// Type for command functions
-type CmdFn = fn(&mut SplitWhitespace) -> ConnAction;
+type ConnFn = fn(&mut SplitWhitespace) -> ConnAction;
 
 #[derive(Debug)]
 pub enum ConnAction {
@@ -17,21 +14,26 @@ pub enum ConnAction {
     Noop(String),
 }
 
-use self::ConnAction::*;
+pub use self::ConnAction::*;
 
-// Create a table for commands. This particular use case doesn't need to be a hashmap, but I wanted
-// to see if it could be done for when I get around to letting players alias their own commands.
+/// Tables of recognized commands before login
 lazy_static! {
-    static ref CONN_CMDS: HashMap<&'static str, CmdFn> = {
-        let mut m = HashMap::new();
-        m.insert("help", help as CmdFn);
-        m.insert("quit", quit as CmdFn);
-        m.insert("register", register as CmdFn);
-        m.insert("login", login as CmdFn);
-        //m.insert("stats", stats as CmdFn);
-        //m.insert("who", who as CmdFn);
+    static ref CONN_CMDS: BTreeMap<&'static str, ConnFn> = {
+        let mut m = BTreeMap::new();
+        m.insert("help", help as ConnFn);
+        m.insert("quit", quit as ConnFn);
+        m.insert("register", register as ConnFn);
+        m.insert("login", login as ConnFn);
+        //m.insert("stats", stats as ConnFn);
+        //m.insert("who", who as ConnFn);
         m
     };
+}
+
+/// Display a list of currently logged in players
+fn who(_line: &mut SplitWhitespace) -> ConnAction {
+    //SHARE.players.lock().unwrap()
+    Noop(format!("Not yet implemented\n"))
 }
 
 /// Display the splash text
@@ -50,7 +52,7 @@ fn register(line: &mut SplitWhitespace) -> ConnAction {
     if let Some(name) = line.next() {
         if let Some(passwd) = line.next() {
             match Account::new(name.to_string(), passwd.to_string()) {
-                Ok(acct) => return Login(acct, format!("Registered new user: {}", name)),
+                Ok(acct) => return Login(acct, format!("Registered new user: {}\n", name)),
                 Err(e) => return Noop(e),
             }
         }

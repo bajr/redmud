@@ -1,5 +1,3 @@
-extern crate tokio;
-
 use bytes::Bytes;
 use futures::sync::mpsc;
 use tokio::io;
@@ -9,7 +7,6 @@ use tokio::prelude::*;
 use std::net::SocketAddr;
 
 use account::Account;
-use cmd::ConnAction::*;
 use cmd::*;
 use lines::{RecvLines, SendLines};
 use shared::*;
@@ -69,6 +66,7 @@ impl Player {
             State::Connected => match cmd_connected(line) {
                 Disconnect => None,
                 Login(acct, s) => {
+                    // Put the player into the Playing state and spawn them into the world.
                     self.state = State::Playing(acct);
                     Some(s)
                 }
@@ -80,6 +78,7 @@ impl Player {
                 unimplemented!();
             }
             State::Playing(ref acct) => {
+                //State::Playing(ref acct) => match cmd_playing(line) {
                 // If they are enterring the world, put them into Playing state
                 // process input
                 unimplemented!();
