@@ -15,16 +15,16 @@ use super::Tx;
 
 #[derive(Debug)]
 enum State {
-    Connected, // Player just connected and has not yet logged in
-    Idle,      // Player is logged in but not in the game world
+    Connected,     // Player just connected and has not yet logged in
+    Idle(Account), // Player is logged in but not in the game world
     Playing(Account), // Player is playing
-               //Prison,    // Player is being punished
+                   //Prison,    // Player is being punished
 }
 
 // The state for each connected client
 pub struct Player {
     insock: RecvLines,  // Socket through which we will receive input from the player
-    outsock: SendLines, // Socket through which we will send outpu to the player
+    outsock: SendLines, // Socket through which we will send output to the player
     addr: SocketAddr,   // The addr is saved so that the Drop impl can clean up its entry
     state: State,       // Player's activity state. Are they logged in?
     tx: Tx,
@@ -45,7 +45,7 @@ impl Player {
         let outsock = SendLines::new(send, rx);
 
         // Add this player to the list.
-        SHARE.players.lock().unwrap().insert(addr, tx.clone());
+        SHARE.conn_players.lock().unwrap().insert(addr, tx.clone());
 
         Player {
             insock,
@@ -67,12 +67,18 @@ impl Player {
                 Disconnect => None,
                 Login(acct, s) => {
                     // Put the player into the Playing state and spawn them into the world.
+                    SHARE.conn_players.lock().unwrap().remove(&self.addr);
+                    SHARE
+                        .play_players
+                        .lock()
+                        .unwrap()
+                        .insert(acct.name.clone(), self.tx.clone());
                     self.state = State::Playing(acct);
                     Some(s)
                 }
                 Noop(s) => Some(s),
             },
-            State::Idle => {
+            State::Idle(ref acct) => {
                 // If they logout, set Account to None and put them in Connected state
                 //Some(format!("You are Idle\n"))
                 unimplemented!();
@@ -126,6 +132,16 @@ impl Future for Player {
 impl Drop for Player {
     fn drop(&mut self) {
         debug!("Player Disconnected");
-        SHARE.players.lock().unwrap().remove(&self.addr);
+        match self.state {
+            State::Connected => {
+                SHARE.conn_players.lock().unwrap().remove(&self.addr);
+            }
+            State::Playing(ref acct) => {
+                SHARE.play_players.lock().unwrap().remove(&acct.name);
+            }
+            State::Idle(ref acct) => {
+                SHARE.play_players.lock().unwrap().remove(&acct.name);
+            }
+        };
     }
 }

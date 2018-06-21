@@ -25,15 +25,21 @@ lazy_static! {
         m.insert("register", register as ConnFn);
         m.insert("login", login as ConnFn);
         //m.insert("stats", stats as ConnFn);
-        //m.insert("who", who as ConnFn);
+        m.insert("who", who as ConnFn);
         m
     };
 }
 
 /// Display a list of currently logged in players
 fn who(_line: &mut SplitWhitespace) -> ConnAction {
-    //SHARE.players.lock().unwrap()
-    Noop(format!("Not yet implemented\n"))
+    let playing = SHARE.play_players.lock().unwrap();
+    let play_cnt = playing.len();
+    let total = SHARE.conn_players.lock().unwrap().len() + play_cnt;
+    let namelist: String = playing.keys().map(|u| format!("  {}\n", u)).collect();
+    Noop(format!(
+        "Total connected: {}. Logged in: {}\n{}",
+        total, play_cnt, namelist
+    ))
 }
 
 /// Display the splash text
