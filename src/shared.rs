@@ -8,6 +8,7 @@ use std::sync::Mutex;
 use std::time::SystemTime;
 
 use super::Tx;
+use player::Player;
 
 // Splash text displayed to all new connections
 pub static SPLASH: &str = "Welcome to RedMud. Please choose an option:\n\
@@ -28,13 +29,15 @@ lazy_static! {
         Shared::new(&db_url)
     };
 }
+
 // TODO I need to rethink this data structure and how/why it's shared.
-// Specifically, the reasonability of sharing this data with every player connection vs having
+// Specifically, the reasonability of sharing this data via a lazy_static vs having
 // 'thin' threads for player connections pass messages to a master thread for processing.
 // I can worry about that later though. This works for now.
 /// A structure of all the things that need to be shared safely among all players
 pub struct Shared {
-    pub players: Mutex<HashMap<SocketAddr, Tx>>,
+    pub conn_players: Mutex<HashMap<SocketAddr, Tx>>,
+    pub play_players: Mutex<HashMap<String, Tx>>,
     pub db_conn: Pool<ConnectionManager<PgConnection>>,
     srv_stats: Mutex<Stats>,
 }
@@ -45,15 +48,6 @@ struct Stats {
     player_count: u32,
 }
 
-impl Stats {
-    fn new() -> Self {
-        Stats {
-            start_time: SystemTime::now(),
-            player_count: 0,
-        }
-    }
-}
-
 impl Shared {
     fn new(db_url: &str) -> Self {
         let manager = ConnectionManager::<PgConnection>::new(db_url);
@@ -61,9 +55,19 @@ impl Shared {
             .build(manager)
             .expect("Failed to create database connection pool.");
         Shared {
-            players: Mutex::new(HashMap::new()),
+            conn_players: Mutex::new(HashMap::new()),
+            play_players: Mutex::new(HashMap::new()),
             db_conn,
             srv_stats: Mutex::new(Stats::new()),
+        }
+    }
+}
+
+impl Stats {
+    fn new() -> Self {
+        Stats {
+            start_time: SystemTime::now(),
+            player_count: 0,
         }
     }
 }
